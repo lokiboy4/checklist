@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pulse Checklist</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel">
+        <form id="task-form" class="task-form" autocomplete="off">
+          <label for="task-input" class="sr-only">New task</label>
+          <input id="task-input" name="task" type="text" maxlength="120" placeholder="Add a task and press Enter" required />
+          <label for="section-input" class="sr-only">Section</label>
+          <input id="section-input" name="section" type="text" maxlength="60" placeholder="Section (e.g. Produce)" list="section-options" />
+          <button type="submit">Add</button>
+        </form>
+        <datalist id="section-options"></datalist>
+
+        <div class="toolbar">
+          <button id="clear-done" class="ghost" type="button">Reset checks</button>
+        </div>
+
+        <ul id="task-list" class="task-list" aria-live="polite"></ul>
+
+        <footer class="status">
+          <span id="count">0 tasks left</span>
+        </footer>
+      </section>
+    </main>
+
+    <template id="task-template">
+      <li class="task-item">
+        <label>
+          <input type="checkbox" />
+          <span class="task-text"></span>
+        </label>
+        <div class="stock-editor">
+          <label class="sr-only">Current stock</label>
+          <select class="stock-input stock-current" aria-label="Current stock"></select>
+          <span>/</span>
+          <label class="sr-only">Target stock</label>
+          <select class="stock-input stock-target" aria-label="Target stock"></select>
+        </div>
+        <select class="row-color" aria-label="Row color">
+          <option value="default">Default</option>
+          <option value="red">Red</option>
+          <option value="yellow">Yellow</option>
+          <option value="blue">Blue</option>
+          <option value="green">Green</option>
+        </select>
+        <div class="task-actions">
+          <button class="detail" type="button" aria-label="View details">i</button>
+          <button class="edit" type="button" aria-label="Edit task">✎</button>
+        </div>
+      </li>
+    </template>
+
+    <dialog id="detail-modal" class="detail-modal">
+      <form method="dialog" class="detail-modal-content">
+        <h2 id="detail-title">Item detail</h2>
+        <p class="detail-help">Prep detail / recipe</p>
+        <div class="detail-photo">
+          <div id="detail-photo-preview" class="detail-photo-preview" hidden></div>
+          <label id="detail-photo-button" class="photo-button" for="detail-photo-input">Photo</label>
+          <input id="detail-photo-input" type="file" accept="image/*" multiple hidden />
+        </div>
+        <textarea id="detail-text" rows="7" placeholder="Add prep steps or recipe..." disabled></textarea>
+        <div class="detail-actions">
+          <button id="detail-edit" type="button">Edit</button>
+          <button id="detail-cancel" class="ghost" value="cancel">Cancel</button>
+          <button id="detail-save" value="default">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="edit-modal" class="edit-modal">
+      <form method="dialog" class="edit-modal-content">
+        <h2 id="edit-title">Edit item</h2>
+        <div class="edit-actions">
+          <button id="edit-rename" type="button">Rename</button>
+          <button id="edit-remove" class="danger" type="button">Remove</button>
+        </div>
+        <div class="detail-actions">
+          <button class="ghost" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
