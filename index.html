@@ -69,11 +69,20 @@
       <section id="order-page" class="panel app-page" hidden>
         <div class="page-heading">
           <h1>Order</h1>
-          <p class="page-note">This page is ready for the next feature.</p>
         </div>
+        <form id="order-form" class="task-form" autocomplete="off">
+          <label for="order-input" class="sr-only">New order item</label>
+          <input id="order-input" name="order-item" type="text" maxlength="120" placeholder="Add an order item" required />
+          <label for="order-section-input" class="sr-only">Order section</label>
+          <input id="order-section-input" name="order-section" type="text" maxlength="60" placeholder="Section" />
+          <label for="order-section-picker" class="sr-only">Existing order sections</label>
+          <select id="order-section-picker" aria-label="Existing order sections"></select>
+          <button type="submit">Add</button>
+        </form>
         <div class="page-actions">
           <button id="order-back" class="ghost" type="button">Back to main page</button>
         </div>
+        <ul id="order-list" class="order-list" aria-live="polite"></ul>
       </section>
     </main>
 
@@ -119,6 +128,13 @@
       </li>
     </template>
 
+    <template id="order-item-template">
+      <li class="order-item">
+        <button class="order-item-button" type="button"></button>
+        <select class="stock-input order-value-input" aria-label="Order value"></select>
+      </li>
+    </template>
+
     <template id="section-header-template">
       <li class="section-header section-header-editable">
         <button class="section-title-button" type="button"></button>
@@ -126,6 +142,13 @@
     </template>
 
     <template id="fridge-section-header-template">
+      <li class="section-header section-header-editable fridge-section-header">
+        <button class="section-title-button" type="button"></button>
+        <button class="pickup-button" type="button">Pick up</button>
+      </li>
+    </template>
+
+    <template id="order-section-header-template">
       <li class="section-header section-header-editable fridge-section-header">
         <button class="section-title-button" type="button"></button>
         <button class="pickup-button" type="button">Pick up</button>
@@ -168,6 +191,7 @@
         <h2 id="pickup-title">Pick up list</h2>
         <ul id="pickup-list" class="pickup-list"></ul>
         <div class="detail-actions">
+          <button id="pickup-copy" type="button">Copy list</button>
           <button class="ghost" value="cancel">Close</button>
         </div>
       </form>

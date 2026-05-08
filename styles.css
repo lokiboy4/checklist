@@ -66,7 +66,9 @@ input[type="text"],
 #section-input,
 #section-picker,
 #fridge-section-input,
-#fridge-section-picker {
+#fridge-section-picker,
+#order-section-input,
+#order-section-picker {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--line);
@@ -76,7 +78,8 @@ input[type="text"],
 }
 
 #section-input,
-#fridge-section-input {
+#fridge-section-input,
+#order-section-input {
   min-width: 0;
 }
 
@@ -167,6 +170,15 @@ button:disabled {
 }
 
 .fridge-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+}
+
+.order-list {
   list-style: none;
   margin: 0 0 1rem;
   padding: 0;
@@ -394,6 +406,38 @@ button:disabled {
   line-height: 1.2;
 }
 
+.order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fffdf9;
+  animation: pop 220ms ease both;
+}
+
+.order-item-button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #241d19;
+  text-align: left;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.order-value-input {
+  flex: 0 0 auto;
+}
+
 .detail-modal {
   border: 0;
   border-radius: 14px;
@@ -617,6 +661,12 @@ button:disabled {
     margin-bottom: 0.6rem;
   }
 
+  .order-list {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    margin-bottom: 0.6rem;
+  }
+
   .task-form input[type="text"] {
     padding: 0.42rem 0.45rem;
     font-size: 16px;
@@ -631,7 +681,9 @@ button:disabled {
 
   #section-picker,
   #fridge-section-input,
-  #fridge-section-picker {
+  #fridge-section-picker,
+  #order-section-input,
+  #order-section-picker {
     padding: 0.42rem 0.2rem;
     font-size: 16px;
     border-radius: 8px;
@@ -687,6 +739,11 @@ button:disabled {
     border-radius: 8px;
   }
 
+  .order-item {
+    padding: 0.35rem;
+    border-radius: 8px;
+  }
+
   .fridge-task-text {
     font-size: 0.864rem;
     font-weight: 700;
@@ -700,6 +757,14 @@ button:disabled {
   .fridge-gap-value {
     min-width: 2.2rem;
     font-size: 0.82rem;
+  }
+
+  .order-item-button {
+    font-size: 0.864rem;
+  }
+
+  .order-value-input {
+    width: 2.2rem;
   }
 
   .task-item {

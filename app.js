@@ -62,6 +62,10 @@ const fridgeForm = document.getElementById("fridge-form");
 const fridgeInput = document.getElementById("fridge-input");
 const fridgeSectionInput = document.getElementById("fridge-section-input");
 const fridgeSectionPicker = document.getElementById("fridge-section-picker");
+const orderForm = document.getElementById("order-form");
+const orderInput = document.getElementById("order-input");
+const orderSectionInput = document.getElementById("order-section-input");
+const orderSectionPicker = document.getElementById("order-section-picker");
 const mainMenuButton = document.getElementById("main-menu-button");
 const mainPage = document.getElementById("main-page");
 const checklistPage = document.getElementById("checklist-page");
@@ -75,12 +79,15 @@ const orderBack = document.getElementById("order-back");
 const toolbarSectionSelector = document.getElementById("toolbar-section-selector");
 const list = document.getElementById("task-list");
 const fridgeList = document.getElementById("fridge-list");
+const orderList = document.getElementById("order-list");
 const count = document.getElementById("count");
 const syncStatus = document.getElementById("sync-status");
 const template = document.getElementById("task-template");
 const fridgeTemplate = document.getElementById("fridge-item-template");
+const orderTemplate = document.getElementById("order-item-template");
 const sectionHeaderTemplate = document.getElementById("section-header-template");
 const fridgeSectionHeaderTemplate = document.getElementById("fridge-section-header-template");
+const orderSectionHeaderTemplate = document.getElementById("order-section-header-template");
 const detailModal = document.getElementById("detail-modal");
 const detailTitle = document.getElementById("detail-title");
 const detailText = document.getElementById("detail-text");
@@ -96,10 +103,12 @@ const editRemove = document.getElementById("edit-remove");
 const pickupModal = document.getElementById("pickup-modal");
 const pickupTitle = document.getElementById("pickup-title");
 const pickupList = document.getElementById("pickup-list");
+const pickupCopy = document.getElementById("pickup-copy");
 
 let activeDetailTaskId = null;
 let activeDetailPhotos = [];
 let activeEditTarget = null;
+let activePickupLines = [];
 let cloudDocRef = null;
 
 initializeSync();
@@ -195,6 +204,32 @@ fridgeForm.addEventListener("submit", (event) => {
   void saveState();
 });
 
+orderForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = orderInput.value.trim();
+  const section = normalizeSection(orderSectionInput.value);
+  if (!text) return;
+  if (hasDuplicateName(state.orders, text)) {
+    window.alert(`"${text}" already exists in Order.`);
+    return;
+  }
+
+  state.orders.unshift(
+    normalizeOrderItem({
+      id: crypto.randomUUID(),
+      text,
+      section,
+      value: 0,
+    }),
+  );
+
+  orderInput.value = "";
+  orderSectionInput.value = "";
+  orderSectionPicker.value = "";
+  render();
+  void saveState();
+});
+
 sectionPicker.addEventListener("change", () => {
   if (sectionPicker.value) {
     sectionInput.value = sectionPicker.value;
@@ -204,6 +239,12 @@ sectionPicker.addEventListener("change", () => {
 fridgeSectionPicker.addEventListener("change", () => {
   if (fridgeSectionPicker.value) {
     fridgeSectionInput.value = fridgeSectionPicker.value;
+  }
+});
+
+orderSectionPicker.addEventListener("change", () => {
+  if (orderSectionPicker.value) {
+    orderSectionInput.value = orderSectionPicker.value;
   }
 });
 
@@ -267,6 +308,30 @@ fridgeList.addEventListener("click", (event) => {
   if (event.target.classList.contains("fridge-task-button")) {
     openEditModal("fridge", item.dataset.id);
   }
+});
+
+orderList.addEventListener("click", (event) => {
+  const sectionButton = event.target.closest(".section-title-button");
+  if (sectionButton) {
+    const sectionItem = sectionButton.closest(".section-header");
+    if (!sectionItem) return;
+    renameOrderSection(sectionItem.dataset.section);
+    return;
+  }
+
+  const pickupButton = event.target.closest(".pickup-button");
+  if (pickupButton) {
+    const sectionItem = pickupButton.closest(".section-header");
+    if (!sectionItem) return;
+    openOrderPickupModal(sectionItem.dataset.section);
+    return;
+  }
+
+  const itemButton = event.target.closest(".order-item-button");
+  if (!itemButton) return;
+  const item = itemButton.closest(".order-item");
+  if (!item) return;
+  openEditModal("order", item.dataset.id);
 });
 
 detailEdit.addEventListener("click", () => {
@@ -355,6 +420,24 @@ editModal.addEventListener("close", () => {
   activeEditTarget = null;
 });
 
+pickupCopy.addEventListener("click", async () => {
+  if (activePickupLines.length === 0) {
+    window.alert("No items to copy.");
+    return;
+  }
+
+  const text = activePickupLines.join("\n");
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    window.prompt("Copy this list:", text);
+    return;
+  }
+
+  window.alert("Pick up list copied.");
+});
+
 list.addEventListener("change", (event) => {
   const item = event.target.closest(".task-item");
   if (!item) return;
@@ -412,6 +495,20 @@ fridgeList.addEventListener("change", (event) => {
   }
 });
 
+orderList.addEventListener("change", (event) => {
+  const item = event.target.closest(".order-item");
+  if (!item) return;
+  const orderItem = state.orders.find((entry) => entry.id === item.dataset.id);
+  if (!orderItem) return;
+
+  if (event.target.classList.contains("order-value-input")) {
+    orderItem.value = clampStock(Number.parseInt(event.target.value, 10));
+    event.target.value = String(orderItem.value);
+    render();
+    void saveState();
+  }
+});
+
 async function initializeSync() {
   if (!isFirebaseConfigured()) {
     render();
@@ -437,6 +534,7 @@ async function initializeSync() {
       const remoteFridgeRaw = Array.isArray(remoteData.fridgeItems)
         ? remoteData.fridgeItems
         : null;
+      const remoteOrdersRaw = Array.isArray(remoteData.orders) ? remoteData.orders : null;
 
       const remoteTasks = remoteTasksRaw.map(normalizeTask);
       const fallbackFridge = state.fridgeItems.length > 0
@@ -445,10 +543,14 @@ async function initializeSync() {
       const remoteFridgeItems = remoteFridgeRaw
         ? remoteFridgeRaw.map(normalizeFridgeItem)
         : fallbackFridge.map(normalizeFridgeItem);
+      const remoteOrders = remoteOrdersRaw
+        ? remoteOrdersRaw.map(normalizeOrderItem)
+        : state.orders.map(normalizeOrderItem);
 
       const shouldSeedCloud =
         remoteTasksRaw.length === 0 ||
-        remoteFridgeRaw === null;
+        remoteFridgeRaw === null ||
+        remoteOrdersRaw === null;
 
       if (remoteTasks.length > 0) {
         state.tasks = remoteTasks;
@@ -457,6 +559,8 @@ async function initializeSync() {
       if (remoteFridgeItems.length > 0) {
         state.fridgeItems = remoteFridgeItems;
       }
+
+      state.orders = remoteOrders;
 
       if (shouldSeedCloud) {
         await setDoc(cloudDocRef, serializeState());
@@ -474,12 +578,15 @@ async function initializeSync() {
 function render() {
   list.innerHTML = "";
   fridgeList.innerHTML = "";
+  orderList.innerHTML = "";
   renderPages();
   renderSectionOptions();
   renderFridgeSectionOptions();
+  renderOrderSectionOptions();
   renderToolbarSectionSelector();
   renderChecklist(getVisibleTasks());
   renderFridge(getSortedFridgeItems());
+  renderOrders(getSortedOrders());
   updateCount();
 }
 
@@ -536,6 +643,27 @@ function renderFridge(items) {
   }
 }
 
+function renderOrders(items) {
+  let currentSection = null;
+
+  for (const orderItem of items) {
+    const normalizedSection = normalizeSection(orderItem.section);
+    if (normalizedSection !== currentSection) {
+      const sectionNode = orderSectionHeaderTemplate.content.firstElementChild.cloneNode(true);
+      sectionNode.dataset.section = normalizedSection;
+      sectionNode.querySelector(".section-title-button").textContent = normalizedSection;
+      orderList.appendChild(sectionNode);
+      currentSection = normalizedSection;
+    }
+
+    const node = orderTemplate.content.firstElementChild.cloneNode(true);
+    node.dataset.id = orderItem.id;
+    node.querySelector(".order-item-button").textContent = orderItem.text;
+    fillStockOptions(node.querySelector(".order-value-input"), orderItem.value);
+    orderList.appendChild(node);
+  }
+}
+
 function renameChecklistSection(sectionName) {
   if (!sectionName) return;
   const nextName = window.prompt("New section name:", sectionName);
@@ -584,6 +712,28 @@ function renameFridgeSection(sectionName) {
   void saveState();
 }
 
+function renameOrderSection(sectionName) {
+  if (!sectionName) return;
+  const nextName = window.prompt("New section name:", sectionName);
+  if (nextName === null) return;
+
+  const normalizedNext = normalizeSection(nextName);
+  if (!normalizedNext) return;
+
+  let changed = false;
+  for (const item of state.orders) {
+    if (normalizeSection(item.section) === sectionName) {
+      item.section = normalizedNext;
+      changed = true;
+    }
+  }
+
+  if (!changed) return;
+
+  render();
+  void saveState();
+}
+
 function openPickupModal(sectionName) {
   const items = getSortedFridgeItems().filter(
     (item) =>
@@ -593,6 +743,7 @@ function openPickupModal(sectionName) {
 
   pickupTitle.textContent = `${sectionName} pick up`;
   pickupList.innerHTML = "";
+  activePickupLines = [];
 
   if (items.length === 0) {
     const emptyItem = document.createElement("li");
@@ -605,6 +756,34 @@ function openPickupModal(sectionName) {
       listItem.className = "pickup-item";
       const gapValue = item.targetStock - item.currentStock;
       listItem.textContent = `${item.text} ${gapValue}`;
+      activePickupLines.push(`${item.text} ${gapValue}`);
+      pickupList.appendChild(listItem);
+    }
+  }
+
+  pickupModal.showModal();
+}
+
+function openOrderPickupModal(sectionName) {
+  const items = getSortedOrders().filter(
+    (item) => normalizeSection(item.section) === sectionName && item.value > 0,
+  );
+
+  pickupTitle.textContent = `${sectionName} pick up`;
+  pickupList.innerHTML = "";
+  activePickupLines = [];
+
+  if (items.length === 0) {
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "pickup-empty";
+    emptyItem.textContent = "No items to pick up.";
+    pickupList.appendChild(emptyItem);
+  } else {
+    for (const item of items) {
+      const listItem = document.createElement("li");
+      listItem.className = "pickup-item";
+      listItem.textContent = `${item.text} ${item.value}`;
+      activePickupLines.push(`${item.text} ${item.value}`);
       pickupList.appendChild(listItem);
     }
   }
@@ -652,6 +831,18 @@ function getSortedFridgeItems() {
   });
 }
 
+function getSortedOrders() {
+  return [...state.orders].sort((a, b) => {
+    const sectionCompare = normalizeSection(a.section).localeCompare(
+      normalizeSection(b.section),
+      undefined,
+      { sensitivity: "base" },
+    );
+    if (sectionCompare !== 0) return sectionCompare;
+    return a.text.localeCompare(b.text, undefined, { sensitivity: "base" });
+  });
+}
+
 function renderSectionOptions() {
   const previousValue = sectionPicker.value;
   sectionPicker.innerHTML = "";
@@ -670,6 +861,16 @@ function renderFridgeSectionOptions() {
   ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
   appendPickerOptions(fridgeSectionPicker, names, previousValue);
+}
+
+function renderOrderSectionOptions() {
+  const previousValue = orderSectionPicker.value;
+  orderSectionPicker.innerHTML = "";
+  const names = Array.from(
+    new Set(state.orders.map((item) => normalizeSection(item.section))),
+  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+  appendPickerOptions(orderSectionPicker, names, previousValue);
 }
 
 function appendPickerOptions(select, names, previousValue) {
@@ -752,7 +953,11 @@ function openEditModal(kind, id) {
 
 function getActiveEditEntry() {
   if (!activeEditTarget) return null;
-  const items = activeEditTarget.kind === "fridge" ? state.fridgeItems : state.tasks;
+  const items = activeEditTarget.kind === "fridge"
+    ? state.fridgeItems
+    : activeEditTarget.kind === "order"
+      ? state.orders
+      : state.tasks;
   const index = items.findIndex((entry) => entry.id === activeEditTarget.id);
   if (index < 0) return null;
   return {
@@ -774,6 +979,7 @@ function serializeState() {
   return {
     tasks: state.tasks.map(normalizeTask),
     fridgeItems: state.fridgeItems.map(normalizeFridgeItem),
+    orders: state.orders.map(normalizeOrderItem),
   };
 }
 
@@ -782,6 +988,7 @@ function loadInitialState() {
   return {
     tasks: saved.tasks.map(normalizeTask),
     fridgeItems: saved.fridgeItems.map(normalizeFridgeItem),
+    orders: saved.orders.map(normalizeOrderItem),
   };
 }
 
@@ -792,6 +999,7 @@ function loadLocalState() {
       return {
         tasks: PERMANENT_TASKS.map(cloneTask),
         fridgeItems: PERMANENT_TASKS.map(createFridgeItemFromTask),
+        orders: [],
       };
     }
 
@@ -800,6 +1008,7 @@ function loadLocalState() {
       return {
         tasks: parsed,
         fridgeItems: parsed.map(createFridgeItemFromTask),
+        orders: [],
       };
     }
 
@@ -807,6 +1016,7 @@ function loadLocalState() {
       return {
         tasks: PERMANENT_TASKS.map(cloneTask),
         fridgeItems: PERMANENT_TASKS.map(createFridgeItemFromTask),
+        orders: [],
       };
     }
 
@@ -814,12 +1024,14 @@ function loadLocalState() {
     const fridgeItems = Array.isArray(parsed.fridgeItems)
       ? parsed.fridgeItems
       : tasks.map(createFridgeItemFromTask);
+    const orders = Array.isArray(parsed.orders) ? parsed.orders : [];
 
-    return { tasks, fridgeItems };
+    return { tasks, fridgeItems, orders };
   } catch {
     return {
       tasks: PERMANENT_TASKS.map(cloneTask),
       fridgeItems: PERMANENT_TASKS.map(createFridgeItemFromTask),
+      orders: [],
     };
   }
 }
@@ -846,6 +1058,15 @@ function normalizeFridgeItem(item) {
     currentStock: clampStock(item.currentStock),
     targetStock: clampStock(item.targetStock),
     section: normalizeSection(item.section),
+  };
+}
+
+function normalizeOrderItem(item) {
+  return {
+    id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+    text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : "Untitled",
+    section: normalizeSection(item.section),
+    value: clampStock(item.value),
   };
 }
 
