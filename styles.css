@@ -133,6 +133,21 @@ button:disabled {
   margin-bottom: 1.1rem;
 }
 
+.fridge-page-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #241d19;
+}
+
+.main-logo {
+  display: block;
+  width: min(320px, 100%);
+  height: auto;
+  object-fit: contain;
+  justify-self: center;
+}
+
 .page-note {
   margin: 0;
   color: #6f5d52;
@@ -141,13 +156,78 @@ button:disabled {
 
 .menu-grid {
   display: grid;
-  gap: 0.8rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
 }
 
 .menu-button {
-  min-height: 3.4rem;
-  font-size: 1rem;
+  position: relative;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 0.7rem;
+  font-size: 0.88rem;
   font-weight: 700;
+  line-height: 1.1;
+  text-align: left;
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 36%),
+    linear-gradient(145deg, #e96d27 0%, #b64812 100%);
+  box-shadow: 0 16px 28px rgba(165, 82, 33, 0.22);
+  isolation: isolate;
+}
+
+.menu-icon {
+  width: 70%;
+  aspect-ratio: 1 / 1;
+  max-width: 3.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.menu-icon svg {
+  width: 70%;
+  height: 70%;
+  fill: currentColor;
+}
+
+.menu-label {
+  display: block;
+  max-width: 6ch;
+}
+
+.menu-button.ghost {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.28), transparent 36%),
+    linear-gradient(145deg, #e96d27 0%, #b64812 100%);
+  color: #fff;
+}
+
+.menu-button::after {
+  content: "";
+  position: absolute;
+  inset: auto;
+  width: 10px;
+  height: 10px;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.48);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.menu-button.is-bubbling::after {
+  animation: menu-bubble 520ms ease-out;
 }
 
 .page-actions {
@@ -390,20 +470,11 @@ button:disabled {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
   color: #6e5b4f;
   font-size: 0.82rem;
   font-weight: 700;
   white-space: nowrap;
-}
-
-.fridge-gap-value {
-  color: #c54141;
-  min-width: 2.6rem;
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.2;
 }
 
 .order-item {
@@ -632,6 +703,17 @@ button:disabled {
   }
 }
 
+@keyframes menu-bubble {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(24);
+    opacity: 0;
+  }
+}
+
 @media (max-width: 640px) {
   .app-shell {
     min-height: auto;
@@ -708,12 +790,19 @@ button:disabled {
   }
 
   .menu-grid {
-    gap: 0.55rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
   }
 
   .menu-button {
-    min-height: 2.8rem;
-    font-size: 0.95rem;
+    border-radius: 14px;
+    padding: 0.45rem;
+    font-size: 0.72rem;
+  }
+
+  .menu-icon {
+    max-width: none;
+    border-radius: 10px;
   }
 
   .section-header {
@@ -752,11 +841,6 @@ button:disabled {
   .fridge-inline-values {
     gap: 0.12rem;
     font-size: 0.62rem;
-  }
-
-  .fridge-gap-value {
-    min-width: 2.2rem;
-    font-size: 0.82rem;
   }
 
   .order-item-button {

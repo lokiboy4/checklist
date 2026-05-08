@@ -8,12 +8,14 @@ import {
 import { firebaseSettings } from "./firebase-config.js";
 
 const STORAGE_KEY = "pulse-checklist-v1";
+const PREP_ALERT_AFTER_MS = 3 * 60 * 60 * 1000;
 const PERMANENT_TASKS = [
   {
     id: "perm-carrot",
     text: "Carrot",
     done: false,
     permanent: true,
+    value: 5,
     currentStock: 2,
     targetStock: 5,
     detail: "",
@@ -26,6 +28,7 @@ const PERMANENT_TASKS = [
     text: "Avocado",
     done: false,
     permanent: true,
+    value: 0,
     currentStock: 0,
     targetStock: 0,
     detail: "",
@@ -38,6 +41,7 @@ const PERMANENT_TASKS = [
     text: "Bread",
     done: false,
     permanent: true,
+    value: 0,
     currentStock: 0,
     targetStock: 0,
     detail: "",
@@ -51,7 +55,7 @@ const state = {
   ...loadInitialState(),
   syncMode: "local",
   selectedSection: "",
-  currentPage: "checklist",
+  currentPage: "main",
 };
 
 const form = document.getElementById("task-form");
@@ -104,6 +108,7 @@ const pickupModal = document.getElementById("pickup-modal");
 const pickupTitle = document.getElementById("pickup-title");
 const pickupList = document.getElementById("pickup-list");
 const pickupCopy = document.getElementById("pickup-copy");
+const menuButtons = [menuPrep, menuFridge, menuOrder];
 
 let activeDetailTaskId = null;
 let activeDetailPhotos = [];
@@ -113,6 +118,26 @@ let cloudDocRef = null;
 
 initializeSync();
 render();
+window.setInterval(() => {
+  render();
+}, 60 * 1000);
+
+for (const button of menuButtons) {
+  button.addEventListener("click", (event) => {
+    const rect = button.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    button.style.setProperty("--ripple-x", `${x}px`);
+    button.style.setProperty("--ripple-y", `${y}px`);
+    button.classList.remove("is-bubbling");
+    void button.offsetWidth;
+    button.classList.add("is-bubbling");
+  });
+
+  button.addEventListener("animationend", () => {
+    button.classList.remove("is-bubbling");
+  });
+}
 
 mainMenuButton.addEventListener("click", () => {
   state.currentPage = "main";
@@ -160,6 +185,7 @@ form.addEventListener("submit", (event) => {
       text,
       done: false,
       permanent: true,
+      value: 0,
       currentStock: 0,
       targetStock: 0,
       detail: "",
@@ -191,8 +217,7 @@ fridgeForm.addEventListener("submit", (event) => {
     normalizeFridgeItem({
       id: crypto.randomUUID(),
       text,
-      currentStock: 0,
-      targetStock: 0,
+      value: 0,
       section,
     }),
   );
@@ -370,6 +395,7 @@ detailSave.addEventListener("click", (event) => {
 
   task.detail = detailText.value.trim();
   task.photos = normalizePhotos(activeDetailPhotos);
+  touchPrepTask(task);
   setDetailEditing(false);
   detailModal.close();
   activeDetailTaskId = null;
@@ -398,6 +424,9 @@ editRename.addEventListener("click", () => {
   }
 
   target.entry.text = trimmed;
+  if (activeEditTarget?.kind === "task") {
+    touchPrepTask(target.entry);
+  }
   editModal.close();
   render();
   void saveState();
@@ -446,28 +475,34 @@ list.addEventListener("change", (event) => {
 
   if (event.target.type === "checkbox") {
     task.done = event.target.checked;
+    if (!task.done) {
+      task.value = 0;
+      item.querySelector(".task-value-input").value = "0";
+    } else if (task.value === 0) {
+      task.value = 1;
+      item.querySelector(".task-value-input").value = "1";
+    }
+    touchPrepTask(task);
     item.classList.toggle("done", task.done);
     updateCount();
     void saveState();
     return;
   }
 
-  if (event.target.classList.contains("stock-current")) {
-    task.currentStock = clampStock(Number.parseInt(event.target.value, 10));
-    event.target.value = String(task.currentStock);
-    void saveState();
-    return;
-  }
-
-  if (event.target.classList.contains("stock-target")) {
-    task.targetStock = clampStock(Number.parseInt(event.target.value, 10));
-    event.target.value = String(task.targetStock);
+  if (event.target.classList.contains("task-value-input")) {
+    task.value = clampTaskValue(Number.parseInt(event.target.value, 10));
+    event.target.value = String(task.value);
+    task.done = task.value > 0;
+    touchPrepTask(task);
+    item.classList.toggle("done", task.done);
+    updateCount();
     void saveState();
     return;
   }
 
   if (event.target.classList.contains("row-color")) {
     task.color = isAllowedColor(event.target.value) ? event.target.value : "default";
+    touchPrepTask(task);
     render();
     void saveState();
   }
@@ -479,17 +514,9 @@ fridgeList.addEventListener("change", (event) => {
   const fridgeItem = state.fridgeItems.find((entry) => entry.id === item.dataset.id);
   if (!fridgeItem) return;
 
-  if (event.target.classList.contains("stock-current")) {
-    fridgeItem.currentStock = clampStock(Number.parseInt(event.target.value, 10));
-    event.target.value = String(fridgeItem.currentStock);
-    render();
-    void saveState();
-    return;
-  }
-
-  if (event.target.classList.contains("stock-target")) {
-    fridgeItem.targetStock = clampStock(Number.parseInt(event.target.value, 10));
-    event.target.value = String(fridgeItem.targetStock);
+  if (event.target.classList.contains("fridge-value-input")) {
+    fridgeItem.value = clampStock(Number.parseInt(event.target.value, 10));
+    event.target.value = String(fridgeItem.value);
     render();
     void saveState();
   }
@@ -607,12 +634,12 @@ function renderChecklist(visibleTasks) {
     node.dataset.id = task.id;
     node.querySelector("input").checked = task.done;
     node.querySelector(".task-text").textContent = task.text;
-    fillStockOptions(node.querySelector(".stock-current"), task.currentStock);
-    fillStockOptions(node.querySelector(".stock-target"), task.targetStock);
+    fillValueOptions(node.querySelector(".task-value-input"), task.value);
+    const visualColor = getPrepTaskVisualColor(task);
     node.querySelector(".row-color").value = isAllowedColor(task.color)
       ? task.color
       : "default";
-    node.classList.add(`row-${isAllowedColor(task.color) ? task.color : "default"}`);
+    node.classList.add(`row-${visualColor}`);
     node.classList.toggle("done", task.done);
     list.appendChild(node);
   }
@@ -634,11 +661,7 @@ function renderFridge(items) {
     const node = fridgeTemplate.content.firstElementChild.cloneNode(true);
     node.dataset.id = fridgeItem.id;
     node.querySelector(".fridge-task-text").textContent = fridgeItem.text;
-    fillStockOptions(node.querySelector(".stock-current"), fridgeItem.currentStock);
-    fillStockOptions(node.querySelector(".stock-target"), fridgeItem.targetStock);
-    node.querySelector(".fridge-gap-value").textContent = String(
-      Math.max(0, fridgeItem.targetStock - fridgeItem.currentStock),
-    );
+    fillStockOptions(node.querySelector(".fridge-value-input"), fridgeItem.value);
     fridgeList.appendChild(node);
   }
 }
@@ -676,6 +699,7 @@ function renameChecklistSection(sectionName) {
   for (const task of state.tasks) {
     if (normalizeSection(task.section) === sectionName) {
       task.section = normalizedNext;
+      touchPrepTask(task);
       changed = true;
     }
   }
@@ -736,9 +760,7 @@ function renameOrderSection(sectionName) {
 
 function openPickupModal(sectionName) {
   const items = getSortedFridgeItems().filter(
-    (item) =>
-      normalizeSection(item.section) === sectionName &&
-      item.targetStock - item.currentStock > 0,
+    (item) => normalizeSection(item.section) === sectionName && item.value > 0,
   );
 
   pickupTitle.textContent = `${sectionName} pick up`;
@@ -754,9 +776,8 @@ function openPickupModal(sectionName) {
     for (const item of items) {
       const listItem = document.createElement("li");
       listItem.className = "pickup-item";
-      const gapValue = item.targetStock - item.currentStock;
-      listItem.textContent = `${item.text} ${gapValue}`;
-      activePickupLines.push(`${item.text} ${gapValue}`);
+      listItem.textContent = `${item.text} ${item.value}`;
+      activePickupLines.push(`${item.text} ${item.value}`);
       pickupList.appendChild(listItem);
     }
   }
@@ -1037,26 +1058,29 @@ function loadLocalState() {
 }
 
 function normalizeTask(item) {
+  const fallbackValue = item.value ?? item.targetStock ?? 0;
   return {
     id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
     text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : "Untitled",
     done: Boolean(item.done),
     permanent: true,
+    value: clampTaskValue(fallbackValue),
     currentStock: clampStock(item.currentStock),
     targetStock: clampStock(item.targetStock),
     detail: typeof item.detail === "string" ? item.detail : "",
     photos: normalizePhotos(item.photos ?? item.photo),
     color: isAllowedColor(item.color) ? item.color : "default",
     section: normalizeSection(item.section),
+    lastChangedAt: normalizeTimestamp(item.lastChangedAt),
   };
 }
 
 function normalizeFridgeItem(item) {
+  const fallbackValue = item.value ?? Math.max(0, clampStock(item.targetStock) - clampStock(item.currentStock));
   return {
     id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
     text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : "Untitled",
-    currentStock: clampStock(item.currentStock),
-    targetStock: clampStock(item.targetStock),
+    value: clampStock(fallbackValue),
     section: normalizeSection(item.section),
   };
 }
@@ -1074,8 +1098,7 @@ function createFridgeItemFromTask(task) {
   return normalizeFridgeItem({
     id: `fridge-${task.id}`,
     text: task.text,
-    currentStock: task.currentStock,
-    targetStock: task.targetStock,
+    value: clampStock(task.value ?? task.targetStock ?? 0),
     section: task.section,
   });
 }
@@ -1113,6 +1136,17 @@ function fillStockOptions(select, selectedValue) {
   }
 }
 
+function fillValueOptions(select, selectedValue) {
+  select.innerHTML = "";
+  for (let value = 0; value <= 20; value += 1) {
+    const option = document.createElement("option");
+    option.value = String(value);
+    option.textContent = String(value);
+    option.selected = value === selectedValue;
+    select.appendChild(option);
+  }
+}
+
 function isAllowedColor(value) {
   return (
     value === "default" ||
@@ -1121,6 +1155,21 @@ function isAllowedColor(value) {
     value === "blue" ||
     value === "green"
   );
+}
+
+function getPrepTaskVisualColor(task) {
+  if (isPrepTaskAlert(task)) {
+    return "red";
+  }
+  return isAllowedColor(task.color) ? task.color : "default";
+}
+
+function isPrepTaskAlert(task) {
+  return Boolean(task.done && Date.now() - task.lastChangedAt >= PREP_ALERT_AFTER_MS);
+}
+
+function touchPrepTask(task) {
+  task.lastChangedAt = Date.now();
 }
 
 function normalizeSection(value) {
@@ -1138,6 +1187,16 @@ function normalizeSection(value) {
 function clampStock(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(20, Math.max(0, Math.floor(value)));
+}
+
+function clampTaskValue(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(20, Math.max(0, Math.floor(value)));
+}
+
+function normalizeTimestamp(value) {
+  if (!Number.isFinite(value)) return Date.now();
+  return Math.max(0, Math.floor(value));
 }
 
 function cloneTask(task) {
