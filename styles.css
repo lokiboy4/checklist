@@ -418,14 +418,16 @@ button:disabled {
   background: transparent;
   color: #8f3d14;
   border: 1px solid #e0b89f;
-  padding: 0.35rem 0.55rem;
+  min-height: 2rem;
+  padding: 0.4rem 0.65rem;
 }
 
 .detail {
   background: #fff2e3;
   color: #8f3d14;
   border: 1px solid #e8c7af;
-  padding: 0.35rem 0.55rem;
+  min-height: 2rem;
+  padding: 0.4rem 0.65rem;
 }
 
 .fridge-item {
@@ -911,8 +913,9 @@ button:disabled {
 
   .detail,
   .edit {
-    min-width: 1.2rem;
-    padding: 0.22rem 0.16rem;
+    min-width: 1.6rem;
+    min-height: 1.5rem;
+    padding: 0.28rem 0.24rem;
     border-radius: 5px;
     font-size: 0.62rem;
     line-height: 1;
