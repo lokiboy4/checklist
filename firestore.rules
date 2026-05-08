@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Beginner-friendly public sync rules for this checklist app.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -11,25 +11,69 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="panel">
+      <section id="main-page" class="panel app-page" hidden>
+        <div class="page-heading">
+          <h1>Main page</h1>
+        </div>
+        <div class="menu-grid">
+          <button id="menu-prep" class="menu-button" type="button">Prep checklist</button>
+          <button id="menu-fridge" class="menu-button ghost" type="button">My Fridge</button>
+          <button id="menu-order" class="menu-button ghost" type="button">Order</button>
+        </div>
+      </section>
+
+      <section id="checklist-page" class="panel app-page">
         <form id="task-form" class="task-form" autocomplete="off">
           <label for="task-input" class="sr-only">New task</label>
           <input id="task-input" name="task" type="text" maxlength="120" placeholder="Add a task and press Enter" required />
           <label for="section-input" class="sr-only">Section</label>
-          <input id="section-input" name="section" type="text" maxlength="60" placeholder="Section (e.g. Produce)" list="section-options" />
+          <input id="section-input" name="section" type="text" maxlength="60" placeholder="Section" />
+          <label for="section-picker" class="sr-only">Existing sections</label>
+          <select id="section-picker" aria-label="Existing sections"></select>
           <button type="submit">Add</button>
         </form>
-        <datalist id="section-options"></datalist>
 
         <div class="toolbar">
-          <button id="clear-done" class="ghost" type="button">Reset checks</button>
+          <button id="main-menu-button" class="ghost" type="button">Main menu</button>
+          <label for="toolbar-section-selector" class="sr-only">Section filter</label>
+          <select id="toolbar-section-selector" class="toolbar-section-selector" aria-label="Section filter"></select>
         </div>
 
         <ul id="task-list" class="task-list" aria-live="polite"></ul>
 
         <footer class="status">
           <span id="count">0 tasks left</span>
+          <span id="sync-status">Local only</span>
         </footer>
+      </section>
+
+      <section id="fridge-page" class="panel app-page" hidden>
+        <div class="page-heading">
+          <h1>My Fridge</h1>
+        </div>
+        <form id="fridge-form" class="task-form" autocomplete="off">
+          <label for="fridge-input" class="sr-only">New fridge item</label>
+          <input id="fridge-input" name="fridge-item" type="text" maxlength="120" placeholder="Add a fridge item" required />
+          <label for="fridge-section-input" class="sr-only">Fridge section</label>
+          <input id="fridge-section-input" name="fridge-section" type="text" maxlength="60" placeholder="Section" />
+          <label for="fridge-section-picker" class="sr-only">Existing fridge sections</label>
+          <select id="fridge-section-picker" aria-label="Existing fridge sections"></select>
+          <button type="submit">Add</button>
+        </form>
+        <div class="page-actions">
+          <button id="fridge-back" class="ghost" type="button">Back to main page</button>
+        </div>
+        <ul id="fridge-list" class="fridge-list" aria-live="polite"></ul>
+      </section>
+
+      <section id="order-page" class="panel app-page" hidden>
+        <div class="page-heading">
+          <h1>Order</h1>
+          <p class="page-note">This page is ready for the next feature.</p>
+        </div>
+        <div class="page-actions">
+          <button id="order-back" class="ghost" type="button">Back to main page</button>
+        </div>
       </section>
     </main>
 
@@ -57,6 +101,34 @@
           <button class="detail" type="button" aria-label="View details">i</button>
           <button class="edit" type="button" aria-label="Edit task">✎</button>
         </div>
+      </li>
+    </template>
+
+    <template id="fridge-item-template">
+      <li class="fridge-item">
+        <div class="fridge-item-top">
+          <button class="fridge-task-text fridge-task-button" type="button"></button>
+          <div class="fridge-inline-values">
+            <select class="stock-input stock-current" aria-label="Current stock"></select>
+            <span>/</span>
+            <select class="stock-input stock-target" aria-label="Target stock"></select>
+            <span class="fridge-gap-separator">|</span>
+            <strong class="fridge-gap-value"></strong>
+          </div>
+        </div>
+      </li>
+    </template>
+
+    <template id="section-header-template">
+      <li class="section-header section-header-editable">
+        <button class="section-title-button" type="button"></button>
+      </li>
+    </template>
+
+    <template id="fridge-section-header-template">
+      <li class="section-header section-header-editable fridge-section-header">
+        <button class="section-title-button" type="button"></button>
+        <button class="pickup-button" type="button">Pick up</button>
       </li>
     </template>
 
@@ -91,6 +163,16 @@
       </form>
     </dialog>
 
-    <script src="app.js"></script>
+    <dialog id="pickup-modal" class="edit-modal">
+      <form method="dialog" class="edit-modal-content">
+        <h2 id="pickup-title">Pick up list</h2>
+        <ul id="pickup-list" class="pickup-list"></ul>
+        <div class="detail-actions">
+          <button class="ghost" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="app.js"></script>
   </body>
 </html>
