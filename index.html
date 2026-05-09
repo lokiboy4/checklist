@@ -13,7 +13,11 @@
     <main class="app-shell">
       <section id="main-page" class="panel app-page" hidden>
         <div class="page-heading">
-          <img class="main-logo" src="logo.png" alt="Logo" />
+          <div class="main-logo-stage" role="img" aria-label="Logo">
+            <img class="main-logo-base" src="logo.png" alt="" />
+            <div class="main-logo-outline" aria-hidden="true"></div>
+            <div class="main-logo-fill" aria-hidden="true"></div>
+          </div>
         </div>
         <div class="menu-grid">
           <button id="menu-prep" class="menu-button" type="button">
@@ -63,7 +67,7 @@
         </form>
 
         <div class="toolbar">
-          <button id="main-menu-button" class="ghost" type="button">Main menu</button>
+          <button id="main-menu-button" class="ghost menu-return-button" type="button">Main menu</button>
           <label for="toolbar-section-selector" class="sr-only">Section filter</label>
           <select id="toolbar-section-selector" class="toolbar-section-selector" aria-label="Section filter"></select>
         </div>
@@ -90,7 +94,7 @@
           <button type="submit">Add</button>
         </form>
         <div class="page-actions">
-          <button id="fridge-back" class="ghost" type="button">Back to main page</button>
+          <button id="fridge-back" class="ghost menu-return-button" type="button">Back to main page</button>
         </div>
         <ul id="fridge-list" class="fridge-list" aria-live="polite"></ul>
       </section>
@@ -109,7 +113,7 @@
           <button type="submit">Add</button>
         </form>
         <div class="page-actions">
-          <button id="order-back" class="ghost" type="button">Back to main page</button>
+          <button id="order-back" class="ghost menu-return-button" type="button">Back to main page</button>
         </div>
         <ul id="order-list" class="order-list" aria-live="polite"></ul>
       </section>
@@ -118,23 +122,9 @@
         <div class="page-heading">
           <h1>Fact sheet</h1>
         </div>
-        <form id="factsheet-form" class="factsheet-form" autocomplete="off">
-          <label for="factsheet-name" class="sr-only">Menu name</label>
-          <input id="factsheet-name" name="factsheet-name" type="text" maxlength="120" placeholder="Menu name" required />
-          <label for="factsheet-ingredients" class="sr-only">Ingredients</label>
-          <textarea id="factsheet-ingredients" name="factsheet-ingredients" rows="3" maxlength="500" placeholder="Ingredients"></textarea>
-          <div class="factsheet-dietary-picker" id="factsheet-dietary-picker">
-            <label><input type="checkbox" value="Vegetarian" /> Vegetarian</label>
-            <label><input type="checkbox" value="Vegan" /> Vegan</label>
-            <label><input type="checkbox" value="Nut" /> Nut</label>
-            <label><input type="checkbox" value="Onion" /> Onion</label>
-            <label><input type="checkbox" value="Coriander" /> Coriander</label>
-            <label><input type="checkbox" value="GF" /> GF</label>
-            <label><input type="checkbox" value="GFO" /> GFO</label>
-          </div>
-          <button type="submit">Add</button>
-        </form>
+        <button id="factsheet-toggle" class="factsheet-toggle" type="button">Add item</button>
         <div class="toolbar factsheet-toolbar">
+          <input id="factsheet-search" type="text" placeholder="Search word" aria-label="Search word" />
           <input id="factsheet-filter-ingredient" type="text" placeholder="Filter by ingredient" aria-label="Filter by ingredient" />
           <div class="factsheet-filter-tags" id="factsheet-filter-tags">
             <button class="factsheet-tag-filter" type="button" data-tag="Vegetarian">Vegetarian</button>
@@ -147,7 +137,7 @@
           </div>
         </div>
         <div class="page-actions">
-          <button id="factsheet-back" class="ghost" type="button">Back to main page</button>
+          <button id="factsheet-back" class="ghost menu-return-button" type="button">Back to main page</button>
         </div>
         <ul id="factsheet-list" class="factsheet-list" aria-live="polite"></ul>
       </section>
@@ -156,13 +146,9 @@
     <template id="task-template">
       <li class="task-item">
         <label>
-          <input type="checkbox" />
-          <span class="task-text"></span>
-        </label>
-        <div class="stock-editor">
-          <label class="sr-only">Task value</label>
           <select class="stock-input task-value-input" aria-label="Task value"></select>
-        </div>
+          <button class="task-text task-text-button" type="button"></button>
+        </label>
         <select class="row-color" aria-label="Row color">
           <option value="default">Default</option>
           <option value="red">Red</option>
@@ -172,7 +158,6 @@
         </select>
         <div class="task-actions">
           <button class="detail" type="button" aria-label="View details">i</button>
-          <button class="edit" type="button" aria-label="Edit task">✎</button>
         </div>
       </li>
     </template>
@@ -232,12 +217,16 @@
         <p class="detail-help">Prep detail / recipe</p>
         <div class="detail-photo">
           <div id="detail-photo-preview" class="detail-photo-preview" hidden></div>
-          <label id="detail-photo-button" class="photo-button" for="detail-photo-input">Photo</label>
           <input id="detail-photo-input" type="file" accept="image/*" multiple hidden />
         </div>
         <textarea id="detail-text" rows="7" placeholder="Add prep steps or recipe..." disabled></textarea>
-        <div class="detail-actions">
+        <div class="detail-edit-controls">
+          <label id="detail-photo-button" class="photo-button" for="detail-photo-input">Photo</label>
           <button id="detail-edit" type="button">Edit</button>
+          <button id="detail-rename" type="button">Name</button>
+          <button id="detail-remove" class="danger" type="button">Remove</button>
+        </div>
+        <div class="detail-actions">
           <button id="detail-cancel" class="ghost" value="cancel">Cancel</button>
           <button id="detail-save" value="default">Save</button>
         </div>
@@ -249,6 +238,7 @@
         <h2 id="edit-title">Edit item</h2>
         <div class="edit-actions">
           <button id="edit-rename" type="button">Rename</button>
+          <button id="edit-ingredients" type="button" hidden>Ingredients</button>
           <button id="edit-remove" class="danger" type="button">Remove</button>
         </div>
         <div class="detail-actions">
@@ -275,6 +265,40 @@
         <div class="detail-actions">
           <button id="factsheet-detail-save" type="button">Save</button>
           <button class="ghost" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="factsheet-ingredients-modal" class="detail-modal">
+      <form method="dialog" class="detail-modal-content">
+        <h2 id="factsheet-ingredients-title">Edit ingredients</h2>
+        <textarea id="factsheet-ingredients-text" rows="7" placeholder="Ingredients"></textarea>
+        <div class="detail-actions">
+          <button id="factsheet-ingredients-save" type="button">Save</button>
+          <button class="ghost" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="factsheet-add-modal" class="detail-modal">
+      <form id="factsheet-form" method="dialog" class="detail-modal-content factsheet-add-modal-content" autocomplete="off">
+        <h2>Add fact sheet item</h2>
+        <label for="factsheet-name" class="sr-only">Menu name</label>
+        <input id="factsheet-name" name="factsheet-name" type="text" maxlength="120" placeholder="Menu name" required />
+        <label for="factsheet-ingredients" class="sr-only">Ingredients</label>
+        <textarea id="factsheet-ingredients" name="factsheet-ingredients" rows="4" maxlength="500" placeholder="Ingredients"></textarea>
+        <div class="factsheet-dietary-picker" id="factsheet-dietary-picker">
+          <label><input type="checkbox" value="Vegetarian" /> Vegetarian</label>
+          <label><input type="checkbox" value="Vegan" /> Vegan</label>
+          <label><input type="checkbox" value="Nut" /> Nut</label>
+          <label><input type="checkbox" value="Onion" /> Onion</label>
+          <label><input type="checkbox" value="Coriander" /> Coriander</label>
+          <label><input type="checkbox" value="GF" /> GF</label>
+          <label><input type="checkbox" value="GFO" /> GFO</label>
+        </div>
+        <div class="detail-actions">
+          <button id="factsheet-add-save" type="submit">Save item</button>
+          <button id="factsheet-add-close" class="ghost" type="button">Close</button>
         </div>
       </form>
     </dialog>

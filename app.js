@@ -57,6 +57,7 @@ const state = {
   syncMode: "local",
   selectedSection: "",
   currentPage: "main",
+  factsheetSearch: "",
   factsheetIngredientFilter: "",
   factsheetDietaryFilter: [],
 };
@@ -73,10 +74,14 @@ const orderForm = document.getElementById("order-form");
 const orderInput = document.getElementById("order-input");
 const orderSectionInput = document.getElementById("order-section-input");
 const orderSectionPicker = document.getElementById("order-section-picker");
+const factsheetToggle = document.getElementById("factsheet-toggle");
+const factsheetAddModal = document.getElementById("factsheet-add-modal");
 const factsheetForm = document.getElementById("factsheet-form");
+const factsheetAddClose = document.getElementById("factsheet-add-close");
 const factsheetName = document.getElementById("factsheet-name");
 const factsheetIngredients = document.getElementById("factsheet-ingredients");
 const factsheetDietaryPicker = document.getElementById("factsheet-dietary-picker");
+const factsheetSearch = document.getElementById("factsheet-search");
 const factsheetFilterIngredient = document.getElementById("factsheet-filter-ingredient");
 const factsheetFilterTags = document.getElementById("factsheet-filter-tags");
 const mainMenuButton = document.getElementById("main-menu-button");
@@ -114,9 +119,12 @@ const detailPhotoInput = document.getElementById("detail-photo-input");
 const detailPhotoPreview = document.getElementById("detail-photo-preview");
 const detailPhotoButton = document.getElementById("detail-photo-button");
 const detailSave = document.getElementById("detail-save");
+const detailRename = document.getElementById("detail-rename");
+const detailRemove = document.getElementById("detail-remove");
 const editModal = document.getElementById("edit-modal");
 const editTitle = document.getElementById("edit-title");
 const editRename = document.getElementById("edit-rename");
+const editIngredients = document.getElementById("edit-ingredients");
 const editRemove = document.getElementById("edit-remove");
 const pickupModal = document.getElementById("pickup-modal");
 const pickupTitle = document.getElementById("pickup-title");
@@ -126,6 +134,10 @@ const factsheetDetailModal = document.getElementById("factsheet-detail-modal");
 const factsheetDetailTitle = document.getElementById("factsheet-detail-title");
 const factsheetDetailText = document.getElementById("factsheet-detail-text");
 const factsheetDetailSave = document.getElementById("factsheet-detail-save");
+const factsheetIngredientsModal = document.getElementById("factsheet-ingredients-modal");
+const factsheetIngredientsTitle = document.getElementById("factsheet-ingredients-title");
+const factsheetIngredientsText = document.getElementById("factsheet-ingredients-text");
+const factsheetIngredientsSave = document.getElementById("factsheet-ingredients-save");
 const menuButtons = [menuPrep, menuFridge, menuOrder, menuFactsheet];
 
 let activeDetailTaskId = null;
@@ -133,6 +145,7 @@ let activeDetailPhotos = [];
 let activeEditTarget = null;
 let activePickupLines = [];
 let activeFactsheetDetailId = null;
+let activeFactsheetIngredientsId = null;
 let cloudDocRef = null;
 
 initializeSync();
@@ -288,7 +301,10 @@ factsheetForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = factsheetName.value.trim();
   const ingredients = factsheetIngredients.value.trim();
-  const dietary = getFactsheetDietarySelection();
+  const dietary = normalizeFactsheetDietary([
+    ...getFactsheetDietarySelection(),
+    ...detectFactsheetDietaryTags(ingredients),
+  ]);
   if (!name) return;
   if (hasDuplicateName(state.factsheets, name)) {
     window.alert(`"${name}" already exists in Fact sheet.`);
@@ -308,8 +324,34 @@ factsheetForm.addEventListener("submit", (event) => {
   factsheetName.value = "";
   factsheetIngredients.value = "";
   clearFactsheetDietarySelection();
+  factsheetAddModal.close();
   render();
   void saveState();
+});
+
+factsheetToggle.addEventListener("click", () => {
+  factsheetAddModal.showModal();
+  factsheetName.focus();
+});
+
+factsheetAddClose.addEventListener("click", () => {
+  factsheetAddModal.close();
+});
+
+factsheetAddModal.addEventListener("close", () => {
+  factsheetName.value = "";
+  factsheetIngredients.value = "";
+  clearFactsheetDietarySelection();
+});
+
+factsheetIngredients.addEventListener("input", () => {
+  syncFactsheetDietaryFromIngredients();
+});
+
+factsheetDietaryPicker.addEventListener("change", (event) => {
+  if (event.target.type === "checkbox") {
+    event.target.dataset.manual = event.target.checked ? "true" : "";
+  }
 });
 
 sectionPicker.addEventListener("change", () => {
@@ -328,6 +370,11 @@ orderSectionPicker.addEventListener("change", () => {
   if (orderSectionPicker.value) {
     orderSectionInput.value = orderSectionPicker.value;
   }
+});
+
+factsheetSearch.addEventListener("input", () => {
+  state.factsheetSearch = factsheetSearch.value.trim().toLowerCase();
+  render();
 });
 
 factsheetFilterIngredient.addEventListener("input", () => {
@@ -371,19 +418,19 @@ list.addEventListener("click", (event) => {
   if (event.target.classList.contains("detail")) {
     const targetTask = state.tasks.find((task) => task.id === id);
     if (!targetTask) return;
-    activeDetailTaskId = id;
-    detailTitle.textContent = `${targetTask.text} detail`;
-    detailText.value = targetTask.detail || "";
-    activeDetailPhotos = normalizePhotos(targetTask.photos);
-    detailPhotoInput.value = "";
-    renderDetailPhotos();
-    setDetailEditing(false);
-    detailModal.showModal();
+    openTaskDetailModal(targetTask);
     return;
   }
 
-  if (event.target.classList.contains("edit")) {
-    openEditModal("task", id);
+  if (event.target.classList.contains("task-text-button")) {
+    const task = state.tasks.find((entry) => entry.id === id);
+    if (!task) return;
+
+    task.value = task.value > 0 ? 0 : 1;
+    task.done = task.value > 0;
+    touchPrepTask(task);
+    render();
+    void saveState();
   }
 });
 
@@ -501,6 +548,50 @@ detailPhotoInput.addEventListener("change", () => {
   }
 });
 
+detailRename.addEventListener("click", () => {
+  if (!activeDetailTaskId) return;
+  const task = state.tasks.find((entry) => entry.id === activeDetailTaskId);
+  if (!task) return;
+
+  detailModal.close();
+  const nextName = window.prompt("New task name:", task.text);
+  if (nextName === null) {
+    openTaskDetailModal(task);
+    return;
+  }
+  const trimmed = nextName.trim();
+  if (!trimmed) {
+    openTaskDetailModal(task);
+    return;
+  }
+  if (hasDuplicateName(state.tasks, trimmed, task.id)) {
+    window.alert(`"${trimmed}" already exists.`);
+    openTaskDetailModal(task);
+    return;
+  }
+
+  task.text = trimmed;
+  touchPrepTask(task);
+  render();
+  openTaskDetailModal(task);
+  void saveState();
+});
+
+detailRemove.addEventListener("click", () => {
+  if (!activeDetailTaskId) return;
+  const index = state.tasks.findIndex((entry) => entry.id === activeDetailTaskId);
+  if (index < 0) return;
+
+  const task = state.tasks[index];
+  const confirmed = window.confirm(`Remove "${task.text}"?`);
+  if (!confirmed) return;
+
+  state.tasks.splice(index, 1);
+  detailModal.close();
+  render();
+  void saveState();
+});
+
 detailSave.addEventListener("click", (event) => {
   event.preventDefault();
   if (!activeDetailTaskId) return;
@@ -546,6 +637,37 @@ editRename.addEventListener("click", () => {
   void saveState();
 });
 
+editIngredients.addEventListener("click", () => {
+  const target = getActiveEditEntry();
+  if (!target || activeEditTarget?.kind !== "factsheet") return;
+
+  activeFactsheetIngredientsId = target.entry.id;
+  factsheetIngredientsTitle.textContent = `${target.entry.text} ingredients`;
+  factsheetIngredientsText.value = target.entry.ingredients || "";
+  editModal.close();
+  factsheetIngredientsModal.showModal();
+});
+
+factsheetIngredientsSave.addEventListener("click", () => {
+  if (!activeFactsheetIngredientsId) return;
+  const factsheet = state.factsheets.find((entry) => entry.id === activeFactsheetIngredientsId);
+  if (!factsheet) return;
+
+  factsheet.ingredients = factsheetIngredientsText.value.trim();
+  factsheet.dietary = normalizeFactsheetDietary([
+    ...factsheet.dietary,
+    ...detectFactsheetDietaryTags(factsheet.ingredients),
+  ]);
+  factsheetIngredientsModal.close();
+  activeFactsheetIngredientsId = null;
+  render();
+  void saveState();
+});
+
+factsheetIngredientsModal.addEventListener("close", () => {
+  activeFactsheetIngredientsId = null;
+});
+
 editRemove.addEventListener("click", () => {
   const target = getActiveEditEntry();
   if (!target) return;
@@ -561,6 +683,7 @@ editRemove.addEventListener("click", () => {
 
 editModal.addEventListener("close", () => {
   activeEditTarget = null;
+  editIngredients.hidden = true;
 });
 
 pickupCopy.addEventListener("click", async () => {
@@ -586,22 +709,6 @@ list.addEventListener("change", (event) => {
   if (!item) return;
   const task = state.tasks.find((entry) => entry.id === item.dataset.id);
   if (!task) return;
-
-  if (event.target.type === "checkbox") {
-    task.done = event.target.checked;
-    if (!task.done) {
-      task.value = 0;
-      item.querySelector(".task-value-input").value = "0";
-    } else if (task.value === 0) {
-      task.value = 1;
-      item.querySelector(".task-value-input").value = "1";
-    }
-    touchPrepTask(task);
-    item.classList.toggle("done", task.done);
-    updateCount();
-    void saveState();
-    return;
-  }
 
   if (event.target.classList.contains("task-value-input")) {
     task.value = clampTaskValue(Number.parseInt(event.target.value, 10));
@@ -757,13 +864,13 @@ function renderChecklist(visibleTasks) {
 
     const node = template.content.firstElementChild.cloneNode(true);
     node.dataset.id = task.id;
-    node.querySelector("input").checked = task.done;
     node.querySelector(".task-text").textContent = task.text;
     fillValueOptions(node.querySelector(".task-value-input"), task.value);
     const visualColor = getPrepTaskVisualColor(task);
-    node.querySelector(".row-color").value = isAllowedColor(task.color)
-      ? task.color
-      : "default";
+    const colorSelect = node.querySelector(".row-color");
+    colorSelect.value = isAllowedColor(task.color) ? task.color : "default";
+    colorSelect.dataset.color = colorSelect.value;
+    colorSelect.title = `Panel colour: ${colorSelect.value}`;
     node.classList.add(`row-${visualColor}`);
     node.classList.toggle("done", task.done);
     list.appendChild(node);
@@ -1011,11 +1118,25 @@ function getSortedOrders() {
 }
 
 function getFilteredFactsheets() {
+  const search = state.factsheetSearch;
   const ingredientFilter = state.factsheetIngredientFilter;
   const dietaryFilter = state.factsheetDietaryFilter;
 
   return [...state.factsheets]
     .filter((item) => {
+      if (search) {
+        const searchableText = [
+          item.text,
+          item.ingredients,
+          item.detail,
+          item.dietary.join(" "),
+        ].join(" ").toLowerCase();
+
+        if (!searchableText.includes(search)) {
+          return false;
+        }
+      }
+
       if (ingredientFilter && !item.ingredients.toLowerCase().includes(ingredientFilter)) {
         return false;
       }
@@ -1104,6 +1225,17 @@ function updateCount() {
   syncStatus.textContent = state.syncMode === "cloud" ? "Cloud sync" : "Local only";
 }
 
+function openTaskDetailModal(task) {
+  activeDetailTaskId = task.id;
+  detailTitle.textContent = `${task.text} detail`;
+  detailText.value = task.detail || "";
+  activeDetailPhotos = normalizePhotos(task.photos);
+  detailPhotoInput.value = "";
+  renderDetailPhotos();
+  setDetailEditing(false);
+  detailModal.showModal();
+}
+
 function setDetailEditing(isEditing) {
   detailText.disabled = !isEditing;
   detailSave.disabled = !isEditing;
@@ -1134,6 +1266,7 @@ function openEditModal(kind, id) {
   const target = getActiveEditEntry();
   if (!target) return;
   editTitle.textContent = `Edit ${target.entry.text}`;
+  editIngredients.hidden = kind !== "factsheet";
   editModal.showModal();
 }
 
@@ -1294,6 +1427,47 @@ function normalizeFactsheetDietary(value) {
     .filter((item, index, items) => items.indexOf(item) === index);
 }
 
+function detectFactsheetDietaryTags(text) {
+  const normalizedText = ` ${String(text).toLowerCase()} `;
+  const matches = [];
+  const rules = [
+    ["Vegetarian", /\bvegetarian\b|\bvego\b/],
+    ["Vegan", /\bvegan\b/],
+    ["Nut", /\bnuts?\b|\bpeanuts?\b|\balmonds?\b|\bcashews?\b|\bwalnuts?\b|\bhazelnuts?\b|\bpistachios?\b/],
+    ["Onion", /\bonions?\b|\bshallots?\b|\bscallions?\b|\bspring onions?\b/],
+    ["Coriander", /\bcoriander\b|\bcoriandor\b|\bcilantro\b/],
+    ["GFO", /\bgfo\b|\bgluten free option\b|\bgluten-free option\b/],
+    ["GF", /\bgf\b|\bgluten free\b|\bgluten-free\b/],
+  ];
+
+  for (const [tag, pattern] of rules) {
+    if (pattern.test(normalizedText)) {
+      matches.push(tag);
+    }
+  }
+
+  return normalizeFactsheetDietary(matches);
+}
+
+function syncFactsheetDietaryFromIngredients() {
+  const detectedTags = detectFactsheetDietaryTags(factsheetIngredients.value);
+  for (const input of factsheetDietaryPicker.querySelectorAll('input[type="checkbox"]')) {
+    const shouldAutoCheck = detectedTags.includes(input.value);
+    const wasAutoChecked = input.dataset.auto === "true";
+
+    if (shouldAutoCheck) {
+      input.checked = true;
+      input.dataset.auto = "true";
+      continue;
+    }
+
+    if (wasAutoChecked && input.dataset.manual !== "true") {
+      input.checked = false;
+      input.dataset.auto = "";
+    }
+  }
+}
+
 function getFactsheetDietarySelection() {
   return Array.from(
     factsheetDietaryPicker.querySelectorAll('input[type="checkbox"]:checked'),
@@ -1304,10 +1478,13 @@ function getFactsheetDietarySelection() {
 function clearFactsheetDietarySelection() {
   for (const input of factsheetDietaryPicker.querySelectorAll('input[type="checkbox"]')) {
     input.checked = false;
+    input.dataset.auto = "";
+    input.dataset.manual = "";
   }
 }
 
 function syncFactsheetToolbar() {
+  factsheetSearch.value = state.factsheetSearch;
   factsheetFilterIngredient.value = state.factsheetIngredientFilter;
 
   for (const button of factsheetFilterTags.querySelectorAll(".factsheet-tag-filter")) {
