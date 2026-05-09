@@ -40,6 +40,14 @@
             </span>
             <span class="menu-label">Order</span>
           </button>
+          <button id="menu-factsheet" class="menu-button ghost" type="button">
+            <span class="menu-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="img">
+                <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm8 2H6v15h12V9h-4a1 1 0 0 1-1-1V5zm-6 7h8v2H8v-2zm0 4h8v2H8v-2z" />
+              </svg>
+            </span>
+            <span class="menu-label">Fact sheet</span>
+          </button>
         </div>
       </section>
 
@@ -105,6 +113,44 @@
         </div>
         <ul id="order-list" class="order-list" aria-live="polite"></ul>
       </section>
+
+      <section id="factsheet-page" class="panel app-page" hidden>
+        <div class="page-heading">
+          <h1>Fact sheet</h1>
+        </div>
+        <form id="factsheet-form" class="factsheet-form" autocomplete="off">
+          <label for="factsheet-name" class="sr-only">Menu name</label>
+          <input id="factsheet-name" name="factsheet-name" type="text" maxlength="120" placeholder="Menu name" required />
+          <label for="factsheet-ingredients" class="sr-only">Ingredients</label>
+          <textarea id="factsheet-ingredients" name="factsheet-ingredients" rows="3" maxlength="500" placeholder="Ingredients"></textarea>
+          <div class="factsheet-dietary-picker" id="factsheet-dietary-picker">
+            <label><input type="checkbox" value="Vegetarian" /> Vegetarian</label>
+            <label><input type="checkbox" value="Vegan" /> Vegan</label>
+            <label><input type="checkbox" value="Nut" /> Nut</label>
+            <label><input type="checkbox" value="Onion" /> Onion</label>
+            <label><input type="checkbox" value="Coriander" /> Coriander</label>
+            <label><input type="checkbox" value="GF" /> GF</label>
+            <label><input type="checkbox" value="GFO" /> GFO</label>
+          </div>
+          <button type="submit">Add</button>
+        </form>
+        <div class="toolbar factsheet-toolbar">
+          <input id="factsheet-filter-ingredient" type="text" placeholder="Filter by ingredient" aria-label="Filter by ingredient" />
+          <div class="factsheet-filter-tags" id="factsheet-filter-tags">
+            <button class="factsheet-tag-filter" type="button" data-tag="Vegetarian">Vegetarian</button>
+            <button class="factsheet-tag-filter" type="button" data-tag="Vegan">Vegan</button>
+            <button class="factsheet-tag-filter" type="button" data-tag="Nut">Nut</button>
+            <button class="factsheet-tag-filter" type="button" data-tag="Onion">Onion</button>
+            <button class="factsheet-tag-filter" type="button" data-tag="Coriander">Coriander</button>
+            <button class="factsheet-tag-filter" type="button" data-tag="GF">GF</button>
+            <button class="factsheet-tag-filter" type="button" data-tag="GFO">GFO</button>
+          </div>
+        </div>
+        <div class="page-actions">
+          <button id="factsheet-back" class="ghost" type="button">Back to main page</button>
+        </div>
+        <ul id="factsheet-list" class="factsheet-list" aria-live="polite"></ul>
+      </section>
     </main>
 
     <template id="task-template">
@@ -146,6 +192,17 @@
       <li class="order-item">
         <button class="order-item-button" type="button"></button>
         <select class="stock-input order-value-input" aria-label="Order value"></select>
+      </li>
+    </template>
+
+    <template id="factsheet-item-template">
+      <li class="factsheet-item">
+        <div class="factsheet-item-head">
+          <button class="factsheet-name-button" type="button"></button>
+          <button class="factsheet-detail-button" type="button">Detail</button>
+        </div>
+        <p class="factsheet-ingredients"></p>
+        <div class="factsheet-tags"></div>
       </li>
     </template>
 
@@ -206,6 +263,17 @@
         <ul id="pickup-list" class="pickup-list"></ul>
         <div class="detail-actions">
           <button id="pickup-copy" type="button">Copy list</button>
+          <button class="ghost" value="cancel">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="factsheet-detail-modal" class="detail-modal">
+      <form method="dialog" class="detail-modal-content">
+        <h2 id="factsheet-detail-title">Fact sheet detail</h2>
+        <textarea id="factsheet-detail-text" rows="7" placeholder="Add notes or detail..."></textarea>
+        <div class="detail-actions">
+          <button id="factsheet-detail-save" type="button">Save</button>
           <button class="ghost" value="cancel">Close</button>
         </div>
       </form>

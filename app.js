@@ -9,6 +9,7 @@ import { firebaseSettings } from "./firebase-config.js";
 
 const STORAGE_KEY = "pulse-checklist-v1";
 const PREP_ALERT_AFTER_MS = 3 * 60 * 60 * 1000;
+const FACTSHEET_TAGS = ["Vegetarian", "Vegan", "Nut", "Onion", "Coriander", "GF", "GFO"];
 const PERMANENT_TASKS = [
   {
     id: "perm-carrot",
@@ -56,6 +57,8 @@ const state = {
   syncMode: "local",
   selectedSection: "",
   currentPage: "main",
+  factsheetIngredientFilter: "",
+  factsheetDietaryFilter: [],
 };
 
 const form = document.getElementById("task-form");
@@ -70,25 +73,36 @@ const orderForm = document.getElementById("order-form");
 const orderInput = document.getElementById("order-input");
 const orderSectionInput = document.getElementById("order-section-input");
 const orderSectionPicker = document.getElementById("order-section-picker");
+const factsheetForm = document.getElementById("factsheet-form");
+const factsheetName = document.getElementById("factsheet-name");
+const factsheetIngredients = document.getElementById("factsheet-ingredients");
+const factsheetDietaryPicker = document.getElementById("factsheet-dietary-picker");
+const factsheetFilterIngredient = document.getElementById("factsheet-filter-ingredient");
+const factsheetFilterTags = document.getElementById("factsheet-filter-tags");
 const mainMenuButton = document.getElementById("main-menu-button");
 const mainPage = document.getElementById("main-page");
 const checklistPage = document.getElementById("checklist-page");
 const fridgePage = document.getElementById("fridge-page");
 const orderPage = document.getElementById("order-page");
+const factsheetPage = document.getElementById("factsheet-page");
 const menuPrep = document.getElementById("menu-prep");
 const menuFridge = document.getElementById("menu-fridge");
 const menuOrder = document.getElementById("menu-order");
+const menuFactsheet = document.getElementById("menu-factsheet");
 const fridgeBack = document.getElementById("fridge-back");
 const orderBack = document.getElementById("order-back");
+const factsheetBack = document.getElementById("factsheet-back");
 const toolbarSectionSelector = document.getElementById("toolbar-section-selector");
 const list = document.getElementById("task-list");
 const fridgeList = document.getElementById("fridge-list");
 const orderList = document.getElementById("order-list");
+const factsheetList = document.getElementById("factsheet-list");
 const count = document.getElementById("count");
 const syncStatus = document.getElementById("sync-status");
 const template = document.getElementById("task-template");
 const fridgeTemplate = document.getElementById("fridge-item-template");
 const orderTemplate = document.getElementById("order-item-template");
+const factsheetTemplate = document.getElementById("factsheet-item-template");
 const sectionHeaderTemplate = document.getElementById("section-header-template");
 const fridgeSectionHeaderTemplate = document.getElementById("fridge-section-header-template");
 const orderSectionHeaderTemplate = document.getElementById("order-section-header-template");
@@ -108,12 +122,17 @@ const pickupModal = document.getElementById("pickup-modal");
 const pickupTitle = document.getElementById("pickup-title");
 const pickupList = document.getElementById("pickup-list");
 const pickupCopy = document.getElementById("pickup-copy");
-const menuButtons = [menuPrep, menuFridge, menuOrder];
+const factsheetDetailModal = document.getElementById("factsheet-detail-modal");
+const factsheetDetailTitle = document.getElementById("factsheet-detail-title");
+const factsheetDetailText = document.getElementById("factsheet-detail-text");
+const factsheetDetailSave = document.getElementById("factsheet-detail-save");
+const menuButtons = [menuPrep, menuFridge, menuOrder, menuFactsheet];
 
 let activeDetailTaskId = null;
 let activeDetailPhotos = [];
 let activeEditTarget = null;
 let activePickupLines = [];
+let activeFactsheetDetailId = null;
 let cloudDocRef = null;
 
 initializeSync();
@@ -159,12 +178,22 @@ menuOrder.addEventListener("click", () => {
   render();
 });
 
+menuFactsheet.addEventListener("click", () => {
+  state.currentPage = "factsheet";
+  render();
+});
+
 fridgeBack.addEventListener("click", () => {
   state.currentPage = "main";
   render();
 });
 
 orderBack.addEventListener("click", () => {
+  state.currentPage = "main";
+  render();
+});
+
+factsheetBack.addEventListener("click", () => {
   state.currentPage = "main";
   render();
 });
@@ -255,6 +284,34 @@ orderForm.addEventListener("submit", (event) => {
   void saveState();
 });
 
+factsheetForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = factsheetName.value.trim();
+  const ingredients = factsheetIngredients.value.trim();
+  const dietary = getFactsheetDietarySelection();
+  if (!name) return;
+  if (hasDuplicateName(state.factsheets, name)) {
+    window.alert(`"${name}" already exists in Fact sheet.`);
+    return;
+  }
+
+  state.factsheets.unshift(
+    normalizeFactsheetItem({
+      id: crypto.randomUUID(),
+      text: name,
+      ingredients,
+      dietary,
+      detail: "",
+    }),
+  );
+
+  factsheetName.value = "";
+  factsheetIngredients.value = "";
+  clearFactsheetDietarySelection();
+  render();
+  void saveState();
+});
+
 sectionPicker.addEventListener("change", () => {
   if (sectionPicker.value) {
     sectionInput.value = sectionPicker.value;
@@ -271,6 +328,26 @@ orderSectionPicker.addEventListener("change", () => {
   if (orderSectionPicker.value) {
     orderSectionInput.value = orderSectionPicker.value;
   }
+});
+
+factsheetFilterIngredient.addEventListener("input", () => {
+  state.factsheetIngredientFilter = factsheetFilterIngredient.value.trim().toLowerCase();
+  render();
+});
+
+factsheetFilterTags.addEventListener("click", (event) => {
+  const button = event.target.closest(".factsheet-tag-filter");
+  if (!button) return;
+  const { tag } = button.dataset;
+  if (!tag) return;
+
+  if (state.factsheetDietaryFilter.includes(tag)) {
+    state.factsheetDietaryFilter = state.factsheetDietaryFilter.filter((item) => item !== tag);
+  } else {
+    state.factsheetDietaryFilter = [...state.factsheetDietaryFilter, tag];
+  }
+
+  render();
 });
 
 toolbarSectionSelector.addEventListener("change", () => {
@@ -357,6 +434,43 @@ orderList.addEventListener("click", (event) => {
   const item = itemButton.closest(".order-item");
   if (!item) return;
   openEditModal("order", item.dataset.id);
+});
+
+factsheetList.addEventListener("click", (event) => {
+  const detailButton = event.target.closest(".factsheet-detail-button");
+  if (detailButton) {
+    const item = detailButton.closest(".factsheet-item");
+    if (!item) return;
+    const factsheet = state.factsheets.find((entry) => entry.id === item.dataset.id);
+    if (!factsheet) return;
+    activeFactsheetDetailId = factsheet.id;
+    factsheetDetailTitle.textContent = `${factsheet.text} detail`;
+    factsheetDetailText.value = factsheet.detail || "";
+    factsheetDetailModal.showModal();
+    return;
+  }
+
+  const button = event.target.closest(".factsheet-name-button");
+  if (!button) return;
+  const item = button.closest(".factsheet-item");
+  if (!item) return;
+  openEditModal("factsheet", item.dataset.id);
+});
+
+factsheetDetailSave.addEventListener("click", () => {
+  if (!activeFactsheetDetailId) return;
+  const factsheet = state.factsheets.find((entry) => entry.id === activeFactsheetDetailId);
+  if (!factsheet) return;
+
+  factsheet.detail = factsheetDetailText.value.trim();
+  factsheetDetailModal.close();
+  activeFactsheetDetailId = null;
+  render();
+  void saveState();
+});
+
+factsheetDetailModal.addEventListener("close", () => {
+  activeFactsheetDetailId = null;
 });
 
 detailEdit.addEventListener("click", () => {
@@ -562,6 +676,9 @@ async function initializeSync() {
         ? remoteData.fridgeItems
         : null;
       const remoteOrdersRaw = Array.isArray(remoteData.orders) ? remoteData.orders : null;
+      const remoteFactsheetsRaw = Array.isArray(remoteData.factsheets)
+        ? remoteData.factsheets
+        : null;
 
       const remoteTasks = remoteTasksRaw.map(normalizeTask);
       const fallbackFridge = state.fridgeItems.length > 0
@@ -573,11 +690,15 @@ async function initializeSync() {
       const remoteOrders = remoteOrdersRaw
         ? remoteOrdersRaw.map(normalizeOrderItem)
         : state.orders.map(normalizeOrderItem);
+      const remoteFactsheets = remoteFactsheetsRaw
+        ? remoteFactsheetsRaw.map(normalizeFactsheetItem)
+        : state.factsheets.map(normalizeFactsheetItem);
 
       const shouldSeedCloud =
         remoteTasksRaw.length === 0 ||
         remoteFridgeRaw === null ||
-        remoteOrdersRaw === null;
+        remoteOrdersRaw === null ||
+        remoteFactsheetsRaw === null;
 
       if (remoteTasks.length > 0) {
         state.tasks = remoteTasks;
@@ -588,6 +709,7 @@ async function initializeSync() {
       }
 
       state.orders = remoteOrders;
+      state.factsheets = remoteFactsheets;
 
       if (shouldSeedCloud) {
         await setDoc(cloudDocRef, serializeState());
@@ -606,6 +728,7 @@ function render() {
   list.innerHTML = "";
   fridgeList.innerHTML = "";
   orderList.innerHTML = "";
+  factsheetList.innerHTML = "";
   renderPages();
   renderSectionOptions();
   renderFridgeSectionOptions();
@@ -614,6 +737,8 @@ function render() {
   renderChecklist(getVisibleTasks());
   renderFridge(getSortedFridgeItems());
   renderOrders(getSortedOrders());
+  renderFactsheets(getFilteredFactsheets());
+  syncFactsheetToolbar();
   updateCount();
 }
 
@@ -684,6 +809,26 @@ function renderOrders(items) {
     node.querySelector(".order-item-button").textContent = orderItem.text;
     fillStockOptions(node.querySelector(".order-value-input"), orderItem.value);
     orderList.appendChild(node);
+  }
+}
+
+function renderFactsheets(items) {
+  for (const factsheet of items) {
+    const node = factsheetTemplate.content.firstElementChild.cloneNode(true);
+    node.dataset.id = factsheet.id;
+    node.querySelector(".factsheet-name-button").textContent = factsheet.text;
+    node.querySelector(".factsheet-ingredients").textContent =
+      factsheet.ingredients || "No ingredients";
+
+    const tagsNode = node.querySelector(".factsheet-tags");
+    for (const tag of factsheet.dietary) {
+      const chip = document.createElement("span");
+      chip.className = "factsheet-tag";
+      chip.textContent = tag;
+      tagsNode.appendChild(chip);
+    }
+
+    factsheetList.appendChild(node);
   }
 }
 
@@ -817,6 +962,7 @@ function renderPages() {
   checklistPage.hidden = state.currentPage !== "checklist";
   fridgePage.hidden = state.currentPage !== "fridge";
   orderPage.hidden = state.currentPage !== "order";
+  factsheetPage.hidden = state.currentPage !== "factsheet";
 }
 
 function getVisibleTasks() {
@@ -862,6 +1008,25 @@ function getSortedOrders() {
     if (sectionCompare !== 0) return sectionCompare;
     return a.text.localeCompare(b.text, undefined, { sensitivity: "base" });
   });
+}
+
+function getFilteredFactsheets() {
+  const ingredientFilter = state.factsheetIngredientFilter;
+  const dietaryFilter = state.factsheetDietaryFilter;
+
+  return [...state.factsheets]
+    .filter((item) => {
+      if (ingredientFilter && !item.ingredients.toLowerCase().includes(ingredientFilter)) {
+        return false;
+      }
+
+      if (dietaryFilter.length > 0) {
+        return dietaryFilter.every((tag) => item.dietary.includes(tag));
+      }
+
+      return true;
+    })
+    .sort((a, b) => a.text.localeCompare(b.text, undefined, { sensitivity: "base" }));
 }
 
 function renderSectionOptions() {
@@ -978,6 +1143,8 @@ function getActiveEditEntry() {
     ? state.fridgeItems
     : activeEditTarget.kind === "order"
       ? state.orders
+      : activeEditTarget.kind === "factsheet"
+        ? state.factsheets
       : state.tasks;
   const index = items.findIndex((entry) => entry.id === activeEditTarget.id);
   if (index < 0) return null;
@@ -1001,6 +1168,7 @@ function serializeState() {
     tasks: state.tasks.map(normalizeTask),
     fridgeItems: state.fridgeItems.map(normalizeFridgeItem),
     orders: state.orders.map(normalizeOrderItem),
+    factsheets: state.factsheets.map(normalizeFactsheetItem),
   };
 }
 
@@ -1010,6 +1178,7 @@ function loadInitialState() {
     tasks: saved.tasks.map(normalizeTask),
     fridgeItems: saved.fridgeItems.map(normalizeFridgeItem),
     orders: saved.orders.map(normalizeOrderItem),
+    factsheets: saved.factsheets.map(normalizeFactsheetItem),
   };
 }
 
@@ -1021,6 +1190,7 @@ function loadLocalState() {
         tasks: PERMANENT_TASKS.map(cloneTask),
         fridgeItems: PERMANENT_TASKS.map(createFridgeItemFromTask),
         orders: [],
+        factsheets: [],
       };
     }
 
@@ -1030,6 +1200,7 @@ function loadLocalState() {
         tasks: parsed,
         fridgeItems: parsed.map(createFridgeItemFromTask),
         orders: [],
+        factsheets: [],
       };
     }
 
@@ -1038,6 +1209,7 @@ function loadLocalState() {
         tasks: PERMANENT_TASKS.map(cloneTask),
         fridgeItems: PERMANENT_TASKS.map(createFridgeItemFromTask),
         orders: [],
+        factsheets: [],
       };
     }
 
@@ -1046,13 +1218,15 @@ function loadLocalState() {
       ? parsed.fridgeItems
       : tasks.map(createFridgeItemFromTask);
     const orders = Array.isArray(parsed.orders) ? parsed.orders : [];
+    const factsheets = Array.isArray(parsed.factsheets) ? parsed.factsheets : [];
 
-    return { tasks, fridgeItems, orders };
+    return { tasks, fridgeItems, orders, factsheets };
   } catch {
     return {
       tasks: PERMANENT_TASKS.map(cloneTask),
       fridgeItems: PERMANENT_TASKS.map(createFridgeItemFromTask),
       orders: [],
+      factsheets: [],
     };
   }
 }
@@ -1094,6 +1268,16 @@ function normalizeOrderItem(item) {
   };
 }
 
+function normalizeFactsheetItem(item) {
+  return {
+    id: typeof item.id === "string" ? item.id : crypto.randomUUID(),
+    text: typeof item.text === "string" && item.text.trim() ? item.text.trim() : "Untitled",
+    ingredients: typeof item.ingredients === "string" ? item.ingredients.trim() : "",
+    dietary: normalizeFactsheetDietary(item.dietary),
+    detail: typeof item.detail === "string" ? item.detail.trim() : "",
+  };
+}
+
 function createFridgeItemFromTask(task) {
   return normalizeFridgeItem({
     id: `fridge-${task.id}`,
@@ -1101,6 +1285,38 @@ function createFridgeItemFromTask(task) {
     value: clampStock(task.value ?? task.targetStock ?? 0),
     section: task.section,
   });
+}
+
+function normalizeFactsheetDietary(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => FACTSHEET_TAGS.includes(item))
+    .filter((item, index, items) => items.indexOf(item) === index);
+}
+
+function getFactsheetDietarySelection() {
+  return Array.from(
+    factsheetDietaryPicker.querySelectorAll('input[type="checkbox"]:checked'),
+    (input) => input.value,
+  );
+}
+
+function clearFactsheetDietarySelection() {
+  for (const input of factsheetDietaryPicker.querySelectorAll('input[type="checkbox"]')) {
+    input.checked = false;
+  }
+}
+
+function syncFactsheetToolbar() {
+  factsheetFilterIngredient.value = state.factsheetIngredientFilter;
+
+  for (const button of factsheetFilterTags.querySelectorAll(".factsheet-tag-filter")) {
+    const { tag } = button.dataset;
+    button.classList.toggle(
+      "is-active",
+      Boolean(tag && state.factsheetDietaryFilter.includes(tag)),
+    );
+  }
 }
 
 function hasDuplicateName(items, text, excludeId = "") {

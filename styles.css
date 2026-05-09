@@ -68,7 +68,10 @@ input[type="text"],
 #fridge-section-input,
 #fridge-section-picker,
 #order-section-input,
-#order-section-picker {
+#order-section-picker,
+#factsheet-filter-ingredient,
+#factsheet-name,
+#factsheet-ingredients {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--line);
@@ -79,8 +82,14 @@ input[type="text"],
 
 #section-input,
 #fridge-section-input,
-#order-section-input {
+#order-section-input,
+#factsheet-name {
   min-width: 0;
+}
+
+#factsheet-ingredients {
+  resize: vertical;
+  min-height: 90px;
 }
 
 button {
@@ -265,6 +274,108 @@ button:disabled {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.6rem;
+}
+
+.factsheet-form {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.factsheet-dietary-picker,
+.factsheet-filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.factsheet-dietary-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fffdf9;
+  color: #5e4d43;
+  font-size: 0.84rem;
+}
+
+.factsheet-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.factsheet-item {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fffdf9;
+  animation: pop 220ms ease both;
+}
+
+.factsheet-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.factsheet-name-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #241d19;
+  text-align: left;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.factsheet-detail-button {
+  flex: 0 0 auto;
+  background: #fff2e3;
+  color: #8f3d14;
+  border: 1px solid #e8c7af;
+  padding: 0.35rem 0.6rem;
+}
+
+.factsheet-ingredients {
+  margin: 0;
+  color: #5f5046;
+  line-height: 1.45;
+}
+
+.factsheet-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.5rem;
+}
+
+.factsheet-tag,
+.factsheet-tag-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #e0c2ab;
+  background: #fff2e3;
+  color: #8f3d14;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.factsheet-tag-filter.is-active {
+  background: #da5a1a;
+  color: #fff;
+  border-color: #da5a1a;
 }
 
 .section-header {
@@ -751,6 +862,10 @@ button:disabled {
     margin-bottom: 0.6rem;
   }
 
+  .factsheet-form {
+    gap: 0.35rem;
+  }
+
   .task-form input[type="text"] {
     padding: 0.42rem 0.45rem;
     font-size: 16px;
@@ -767,7 +882,10 @@ button:disabled {
   #fridge-section-input,
   #fridge-section-picker,
   #order-section-input,
-  #order-section-picker {
+  #order-section-picker,
+  #factsheet-filter-ingredient,
+  #factsheet-name,
+  #factsheet-ingredients {
     padding: 0.42rem 0.2rem;
     font-size: 16px;
     border-radius: 8px;
@@ -835,6 +953,11 @@ button:disabled {
     border-radius: 8px;
   }
 
+  .factsheet-item {
+    padding: 0.45rem;
+    border-radius: 8px;
+  }
+
   .fridge-task-text {
     font-size: 0.864rem;
     font-weight: 700;
@@ -847,6 +970,26 @@ button:disabled {
 
   .order-item-button {
     font-size: 0.864rem;
+  }
+
+  .factsheet-name-button {
+    font-size: 0.864rem;
+  }
+
+  .factsheet-detail-button {
+    padding: 0.25rem 0.45rem;
+    border-radius: 6px;
+    font-size: 0.68rem;
+  }
+
+  .factsheet-ingredients {
+    font-size: 0.76rem;
+  }
+
+  .factsheet-tag,
+  .factsheet-tag-filter,
+  .factsheet-dietary-picker label {
+    font-size: 0.66rem;
   }
 
   .order-value-input {
