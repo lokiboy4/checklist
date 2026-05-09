@@ -833,9 +833,11 @@ button:disabled {
 }
 
 #detail-text:disabled {
-  background: #e5ddd2;
-  color: #6c6258;
-  cursor: not-allowed;
+  background: #faf8ef;
+  color: var(--ink);
+  opacity: 1;
+  -webkit-text-fill-color: var(--ink);
+  cursor: text;
 }
 
 .detail-actions {
